@@ -32,3 +32,12 @@ google-services.json
 
 # Android Profiling
 *.hprof
+# Секреты
+secrets.properties
+.env
+
+# Тяжёлые файлы и личные данные
+app/src/main/assets/model*/
+*.wav
+*.m4a
+*.mp3
