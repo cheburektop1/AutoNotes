@@ -10,6 +10,7 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.concurrent.thread
+import kotlin.math.sqrt
 
 /**
  * Пишет звук с микрофона в WAV: 16 кГц, моно, 16 бит.
@@ -20,6 +21,10 @@ class AudioRecorder {
     @Volatile private var isRecording = false
     @Volatile private var isPaused = false
     @Volatile private var bytesWritten = 0L
+
+    /** Громкость последнего фрагмента от 0 до 1 (для индикатора уровня). */
+    @Volatile var level: Float = 0f
+        private set
 
     private var audioRecord: AudioRecord? = null
     private var worker: Thread? = null
@@ -37,8 +42,6 @@ class AudioRecorder {
         )
         val bufferSize = maxOf(minBuffer, SAMPLE_RATE) // не меньше ~0,5 с звука
 
-        // MIC — обычный микрофон. Если на тестах звук слишком тихий или шумный,
-        // попробуйте MediaRecorder.AudioSource.VOICE_RECOGNITION.
         val record = AudioRecord(
             MediaRecorder.AudioSource.MIC,
             SAMPLE_RATE,
@@ -61,15 +64,19 @@ class AudioRecorder {
         worker = thread(name = "AudioRecorder") {
             FileOutputStream(file).use { out ->
                 out.write(ByteArray(WAV_HEADER_SIZE)) // место под заголовок, заполним при остановке
-                val buffer = ByteArray(bufferSize)
+                val buffer = ByteArray(READ_CHUNK_BYTES)
                 while (isRecording) {
                     val read = record.read(buffer, 0, buffer.size)
                     if (read < 0) break
-                    if (read > 0 && !isPaused) { // на паузе читаем и выбрасываем
-                        out.write(buffer, 0, read)
-                        bytesWritten += read
+                    if (read > 0) {
+                        level = if (isPaused) 0f else peakLevel(buffer, read)
+                        if (!isPaused) { // на паузе читаем и выбрасываем
+                            out.write(buffer, 0, read)
+                            bytesWritten += read
+                        }
                     }
                 }
+                level = 0f
             }
         }
     }
@@ -90,6 +97,19 @@ class AudioRecorder {
         audioRecord = null
         outputFile?.let { writeWavHeader(it, bytesWritten) }
         return elapsedMs
+    }
+
+    /** Пиковая амплитуда фрагмента; корень делает тихую речь заметной на индикаторе. */
+    private fun peakLevel(buffer: ByteArray, length: Int): Float {
+        var peak = 0
+        var i = 0
+        while (i + 1 < length) {
+            val sample = ((buffer[i + 1].toInt() shl 8) or (buffer[i].toInt() and 0xFF)).toShort().toInt()
+            val magnitude = if (sample < 0) -sample else sample
+            if (magnitude > peak) peak = magnitude
+            i += 2
+        }
+        return sqrt(peak / 32768f).coerceIn(0f, 1f)
     }
 
     private fun writeWavHeader(file: File, pcmBytes: Long) {
@@ -119,6 +139,7 @@ class AudioRecorder {
         private const val CHANNELS = 1
         private const val BITS_PER_SAMPLE = 16
         private const val BYTES_PER_SECOND = SAMPLE_RATE * CHANNELS * BITS_PER_SAMPLE / 8 // 32 000
+        private const val READ_CHUNK_BYTES = SAMPLE_RATE / 10 * BITS_PER_SAMPLE / 8      // 100 мс
         private const val WAV_HEADER_SIZE = 44
     }
 }
