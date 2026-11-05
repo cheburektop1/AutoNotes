@@ -81,23 +81,24 @@ class RecordingService : Service() {
         stopSelf()
     }
 
-    /** Останавливает запись и сохраняет её в базу. Безопасно вызывать повторно. */
     private fun finishAndSave() {
         val rec = recorder ?: return
         val duration = rec.stop()
         val file = currentFile
+        val events = RecordingSession.state.value.events // забираем до сброса состояния
         recorder = null
         currentFile = null
         RecordingSession.recorder = null
         RecordingSession.update { RecordingSession.State() }
 
         if (file == null) return
-        // appScope переживает сервис, поэтому запись сохранится, даже если сервис уже уничтожен
         appScope.launch {
             if (duration < MIN_DURATION_MS) {
-                file.delete() // случайное нажатие: слишком короткую запись не храним
+                file.delete()
+                events.filterIsInstance<RecordingSession.PendingEvent.Photo>()
+                    .forEach { File(it.filePath).delete() }
             } else {
-                repository.saveFinished(file.absolutePath, duration)
+                repository.saveFinished(file.absolutePath, duration, events)
             }
         }
     }

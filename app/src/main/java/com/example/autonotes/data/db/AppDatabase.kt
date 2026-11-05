@@ -16,4 +16,7 @@ import androidx.room.RoomDatabase
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun recordingDao(): RecordingDao
+    abstract fun markerDao(): MarkerDao
+    abstract fun noteDao(): NoteDao
+    abstract fun photoDao(): PhotoDao
 }

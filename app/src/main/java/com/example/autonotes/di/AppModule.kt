@@ -14,6 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import javax.inject.Qualifier
 import javax.inject.Singleton
+import com.example.autonotes.data.db.MarkerDao
+import com.example.autonotes.data.db.NoteDao
+import com.example.autonotes.data.db.PhotoDao
 
 @Qualifier
 @Retention(AnnotationRetention.RUNTIME)
@@ -22,13 +25,20 @@ annotation class ApplicationScope
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    @Provides
+    fun provideMarkerDao(db: AppDatabase): MarkerDao = db.markerDao()
 
+    @Provides
+    fun provideNoteDao(db: AppDatabase): NoteDao = db.noteDao()
+
+    @Provides
+    fun providePhotoDao(db: AppDatabase): PhotoDao = db.photoDao()
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "autonotes.db")
             // ТОЛЬКО НА ВРЕМЯ РАЗРАБОТКИ: при смене схемы база пересоздаётся (данные теряются).
-            // Перед релизом заменим на настоящие миграции.
+            // Перед релизом заменю на настоящие миграции.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

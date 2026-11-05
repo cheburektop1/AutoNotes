@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autonotes.data.RecordingRepository
+import com.example.autonotes.data.db.MarkerType
 import com.example.autonotes.data.db.RecordingEntity
 import com.example.autonotes.recording.RecordingService
 import com.example.autonotes.recording.RecordingSession
@@ -35,7 +36,15 @@ class RecordingsViewModel @Inject constructor(
         else RecordingService.pause(context)
     }
 
+    fun addMarker(type: MarkerType) = RecordingSession.addMarker(type)
+
+    fun addNote(text: String, timeMs: Long) = RecordingSession.addNote(text, timeMs)
+
     fun delete(recording: RecordingEntity) {
         viewModelScope.launch { repository.delete(recording) }
+    }
+
+    fun rename(recording: RecordingEntity, title: String) {
+        viewModelScope.launch { repository.rename(recording.id, title) }
     }
 }
